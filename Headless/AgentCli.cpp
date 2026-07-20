@@ -710,6 +710,17 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 		CpuType cpu = SelectCpu(options);
 		ConsoleType console = AgentGetConsoleType();
 		EnableDebuggerForCpu(cpu);
+		// Loading a ROM that was paused before the debugger existed schedules an
+		// asynchronous one-instruction debugger break.  Wait for that break before
+		// mutating debugger-owned state (scripts, breakpoints, input schedules, etc.).
+		// Otherwise a maximum-speed emulation thread can race the CLI setup and run
+		// past a short input window before the frame-step request is installed.
+		auto initialPauseDeadline = chrono::steady_clock::now() + chrono::seconds(options.TimeoutSeconds);
+		while(IsRunning() && !IsExecutionStopped() && chrono::steady_clock::now() < initialPauseDeadline) {
+			this_thread::sleep_for(chrono::milliseconds(1));
+		}
+		if(!IsRunning()) throw runtime_error("emulation stopped while waiting for the initial debugger break");
+		if(!IsExecutionStopped()) throw runtime_error("timed out waiting for the initial debugger break");
 		AgentSetLuaAccess(options.LuaAllowIo, options.LuaAllowNetwork, options.LuaTimeoutSeconds);
 		array<char, 100> sha1 = {};
 		GetRomHash(HashType::Sha1, sha1.data(), (uint32_t)sha1.size());
@@ -804,7 +815,8 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 			//Use the core debugger's PPU-frame counter as the run boundary.  Host-side
 			//polling can overshoot on fast machines and makes Lua event timing depend
 			//on scheduler latency; a PPU-frame step stops at the exact core boundary.
-			Resume();
+			//Step also releases the current debugger break.  Calling Resume first would
+			//open a race where the core can execute frames before this request is armed.
 			Step(cpu, options.Frames, StepType::PpuFrame);
 		}
 		while(options.Frames > 0) {
@@ -830,10 +842,9 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 		};
 		bool luaFailed = hasLuaErrors();
 		if(options.StepCount > 0 && !emulationStopped && !timedOut && !luaFailed) {
-			//A zero-frame run is still paused at the emulator level; debugger
-			//stepping controls its own stop state, so release that outer pause.
-			Resume();
 			uint64_t stepStartClock = AgentGetMasterClock();
+			//Debugger Step atomically installs the request and releases the current
+			//break.  A separate Resume here would create the same run-before-step race.
 			Step(cpu, options.StepCount, SelectStepType(options.StepTypeName));
 			while(true) {
 				if(!IsRunning()) { emulationStopped = true; break; }
