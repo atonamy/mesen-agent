@@ -812,6 +812,7 @@ int LuaApi::TakeScreenshot(lua_State *lua)
 	LuaCallHelper l(lua);
 	checkparams();
 	stringstream ss;
+	_emu->GetVideoDecoder()->WaitForAsyncFrameDecode();
 	_emu->GetVideoDecoder()->TakeScreenshot(ss);
 	l.Return(ss.str());
 	return l.ReturnCount();

@@ -123,6 +123,7 @@ extern "C"
 			return false;
 		}
 		stringstream png;
+		_emu->GetVideoDecoder()->WaitForAsyncFrameDecode();
 		_emu->GetVideoDecoder()->TakeScreenshot(png);
 		return !png.str().empty() && WriteFile(filename, png.str());
 	}
