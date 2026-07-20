@@ -96,6 +96,11 @@ extern "C"
 		return _emu ? _emu->GetFrameCount() : 0;
 	}
 
+	DllExport uint64_t __stdcall AgentGetMasterClock()
+	{
+		return _emu ? _emu->GetMasterClock() : 0;
+	}
+
 	DllExport CpuType __stdcall AgentGetPrimaryCpuType()
 	{
 		if(_emu) {

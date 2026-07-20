@@ -88,6 +88,7 @@ extern "C" {
 	bool AGENT_CALL WaveIsRecording();
 
 	uint32_t AGENT_CALL AgentGetFrameCount();
+	uint64_t AGENT_CALL AgentGetMasterClock();
 	CpuType AGENT_CALL AgentGetPrimaryCpuType();
 	ConsoleType AGENT_CALL AgentGetConsoleType();
 	bool AGENT_CALL AgentSaveScreenshot(const char*);
@@ -345,7 +346,7 @@ namespace
 
 	string ReadTextFile(const string& filename)
 	{
-		ifstream input(fs::u8path(filename), ios::binary);
+		std::ifstream input(fs::u8path(filename), ios::binary);
 		if(!input) {
 			throw runtime_error("could not read file: " + filename);
 		}
@@ -355,7 +356,7 @@ namespace
 	void WriteBinaryFile(const string& filename, const vector<uint8_t>& data)
 	{
 		EnsureParent(filename);
-		ofstream output(fs::u8path(filename), ios::binary | ios::trunc);
+		std::ofstream output(fs::u8path(filename), ios::binary | ios::trunc);
 		if(!output) {
 			throw runtime_error("could not create file: " + filename);
 		}
@@ -830,15 +831,16 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 			//A zero-frame run is still paused at the emulator level; debugger
 			//stepping controls its own stop state, so release that outer pause.
 			Resume();
+			uint64_t stepStartClock = AgentGetMasterClock();
 			Step(cpu, options.StepCount, SelectStepType(options.StepTypeName));
-			bool observedStepRunning = false;
-			auto stepStart = chrono::steady_clock::now();
 			while(true) {
 				if(!IsRunning()) { emulationStopped = true; break; }
 				if(chrono::steady_clock::now() >= deadline) { timedOut = true; break; }
 				bool stopped = IsExecutionStopped();
-				if(!stopped) observedStepRunning = true;
-				if(stopped && (observedStepRunning || chrono::steady_clock::now() - stepStart >= chrono::milliseconds(10))) break;
+				//The running phase can be shorter than this thread's polling interval.
+				//A changed master clock proves the requested step actually executed,
+				//so a slow scheduler cannot mistake the initial break for completion.
+				if(stopped && AgentGetMasterClock() != stepStartClock) break;
 				this_thread::sleep_for(chrono::milliseconds(1));
 			}
 			executionStopped = IsExecutionStopped();
@@ -973,7 +975,7 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 			vector<char> log(1000000, 0);
 			GetLog(log.data(), (uint32_t)log.size());
 			EnsureParent(options.Log);
-			ofstream output(fs::u8path(options.Log), ios::binary | ios::trunc);
+			std::ofstream output(fs::u8path(options.Log), ios::binary | ios::trunc);
 			output.write(log.data(), strlen(log.data()));
 			if(!output.good()) throw runtime_error("could not save log: " + options.Log);
 			Event("\"event\":\"log_saved\",\"file\":\"" + JsonEscape(fs::absolute(fs::u8path(options.Log)).u8string()) + "\"");
