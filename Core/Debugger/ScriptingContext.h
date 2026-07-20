@@ -25,6 +25,15 @@ struct MemoryCallback
 	int Reference;
 };
 
+struct ScriptInputOverride
+{
+	int Port;
+	int SubPort;
+	int ButtonId;
+	bool IsNumeric;
+	int32_t Value;
+};
+
 enum class ScriptDrawSurface
 {
 	ConsoleScreen,
@@ -35,6 +44,7 @@ class ScriptingContext
 {
 private:
 	static ScriptingContext* _context;
+	static bool _breakOnError;
 	lua_State* _lua = nullptr;
 	Timer _timer;
 	EmuSettings* _settings = nullptr;
@@ -42,16 +52,20 @@ private:
 	deque<string> _logRows;
 	SimpleLock _logLock;
 	bool _allowSaveState = false;
+	atomic<uint32_t> _errorCount = 0;
 
 	Debugger* _debugger = nullptr;
 	CpuType _defaultCpuType = {};
 	MemoryType _defaultMemType = {};
+	EventType _currentEvent = EventType::LastValue;
+	vector<ScriptInputOverride> _pendingInputOverrides;
 
 	ScriptDrawSurface _drawSurface = ScriptDrawSurface::ConsoleScreen;
 
 	static void ExecutionCountHook(lua_State* lua);
-	void LuaOpenLibs(lua_State* L, bool allowIoOsAccess);
+	void LuaOpenLibs(lua_State* L, bool allowIoOsAccess, bool allowNetworkAccess);
 	void ProcessLuaError();
+	void ApplyPendingInputOverrides();
 
 protected:
 	string _scriptName;
@@ -71,6 +85,8 @@ public:
 
 	void Log(string message);
 	string GetLog();
+	uint32_t GetErrorCount() { return _errorCount.load(); }
+	static void SetBreakOnError(bool enabled) { _breakOnError = enabled; }
 
 	Debugger* GetDebugger();
 	string GetScriptName();
@@ -85,6 +101,8 @@ public:
 
 	CpuType GetDefaultCpuType() { return _defaultCpuType; }
 	MemoryType GetDefaultMemType() { return _defaultMemType; }
+	bool IsInputPolledEvent() { return _currentEvent == EventType::InputPolled; }
+	void QueueInputOverride(int port, int subPort, int buttonId, bool isNumeric, int32_t value);
 	
 	void RefreshMemoryCallbackFlags();
 

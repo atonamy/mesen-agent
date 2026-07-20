@@ -26,6 +26,7 @@ public:
 	double ReadDouble();
 	bool ReadBool(bool defaultValue = false);
 	uint32_t ReadInteger(uint32_t defaultValue = 0);
+	uint32_t ReadRequiredInteger(const char* paramName);
 	string ReadString();
 	int GetReference();
 

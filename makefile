@@ -5,6 +5,7 @@
 #Run "make" to build, "make run" to run
 
 MESENFLAGS=
+AGENT_BUILD := $(filter agent,$(MAKECMDGOALS))
 
 ifeq ($(USE_GCC),true)
 	CXX := g++
@@ -18,8 +19,15 @@ else
 	PROFILE_USE_FLAG := -fprofile-instr-use=$(CURDIR)/PGOHelper/pgo.profdata
 endif
 
-SDL2LIB := $(shell sdl2-config --libs)
-SDL2INC := $(shell sdl2-config --cflags)
+ifeq ($(AGENT_BUILD),)
+	SDL2LIB := $(shell sdl2-config --libs)
+	SDL2INC := $(shell sdl2-config --cflags)
+else
+	# The terminal agent uses internal software capture/recording and links no
+	# SDL display, host-audio, or input backend.
+	SDL2LIB :=
+	SDL2INC :=
+endif
 
 LINKCHECKUNRESOLVED := -Wl,-z,defs
 
@@ -107,7 +115,14 @@ ifneq ($(STATICLINK),false)
 endif
 
 ifeq ($(MESENOS),osx)
-	LINKOPTIONS += -framework Foundation -framework Cocoa -framework GameController -framework CoreHaptics -Wl,-rpath,/opt/local/lib
+	ifeq ($(AGENT_BUILD),)
+		LINKOPTIONS += -framework Foundation -framework Cocoa -framework GameController -framework CoreHaptics -Wl,-rpath,/opt/local/lib
+	endif
+	AGENTRPATH := -Wl,-rpath,@loader_path
+	SHAREDID := -Wl,-install_name,@rpath/$(SHAREDLIB)
+else
+	AGENTRPATH := -Wl,-rpath,'$$ORIGIN'
+	SHAREDID := -Wl,-soname,$(SHAREDLIB)
 endif
 
 CXXFLAGS = -fPIC -Wall --std=c++17 $(MESENFLAGS) $(SDL2INC) -I $(realpath ./) -I $(realpath ./Core) -I $(realpath ./Utilities) -I $(realpath ./Sdl) -I $(realpath ./Linux) -I $(realpath ./MacOS)
@@ -115,6 +130,9 @@ OBJCXXFLAGS = $(CXXFLAGS)
 CFLAGS = -fPIC -Wall $(MESENFLAGS)
 
 OBJFOLDER := obj.$(MESENPLATFORM)
+ifneq ($(AGENT_BUILD),)
+	OBJFOLDER := obj.agent.$(MESENPLATFORM)
+endif
 DEBUGFOLDER := bin/$(MESENPLATFORM)/Debug
 RELEASEFOLDER := bin/$(MESENPLATFORM)/Release
 ifeq ($(DEBUG), 0)
@@ -141,7 +159,11 @@ COREOBJ := $(CORESRC:.cpp=.o)
 UTILSRC := $(shell find Utilities -name '*.cpp' -o -name '*.c')
 UTILOBJ := $(addsuffix .o,$(basename $(UTILSRC)))
 
-SDLSRC := $(shell find Sdl -name '*.cpp')
+ifeq ($(AGENT_BUILD),)
+	SDLSRC := $(shell find Sdl -name '*.cpp')
+else
+	SDLSRC :=
+endif
 SDLOBJ := $(SDLSRC:.cpp=.o)
 
 SEVENZIPSRC := $(shell find SevenZip -name '*.c')
@@ -150,14 +172,18 @@ SEVENZIPOBJ := $(SEVENZIPSRC:.c=.o)
 LUASRC := $(shell find Lua -name '*.c')
 LUAOBJ := $(LUASRC:.c=.o)
 
-ifeq ($(MESENOS),linux)
+ifneq ($(AGENT_BUILD),)
+	LINUXSRC :=
+else ifeq ($(MESENOS),linux)
 	LINUXSRC := $(shell find Linux -name '*.cpp')
 else
 	LINUXSRC :=
 endif
 LINUXOBJ := $(LINUXSRC:.cpp=.o)
 
-ifeq ($(MESENOS),osx)
+ifneq ($(AGENT_BUILD),)
+	MACOSSRC :=
+else ifeq ($(MESENOS),osx)
 	MACOSSRC := $(shell find MacOS -name '*.mm')
 else
 	MACOSSRC :=
@@ -165,9 +191,21 @@ endif
 MACOSOBJ := $(MACOSSRC:.mm=.o)
 
 DLLSRC := $(shell find InteropDLL -name '*.cpp')
-DLLOBJ := $(DLLSRC:.cpp=.o)
+ifeq ($(AGENT_BUILD),)
+	DLLOBJ := $(DLLSRC:.cpp=.o)
+else
+	DLLOBJ := $(DLLSRC:.cpp=.agent.o)
+endif
 
-ifeq ($(SYSTEM_LIBEVDEV), true)
+AGENTSRC := Headless/AgentCli.cpp
+AGENTOBJ := $(AGENTSRC:.cpp=.agent.o)
+
+ifneq ($(AGENT_BUILD),)
+	LIBEVDEVLIB :=
+	LIBEVDEVSRC :=
+	LIBEVDEVOBJ :=
+	LIBEVDEVINC :=
+else ifeq ($(SYSTEM_LIBEVDEV), true)
 	LIBEVDEVLIB := $(shell pkg-config --libs libevdev)
 	LIBEVDEVINC := $(shell pkg-config --cflags libevdev)
 else
@@ -176,7 +214,9 @@ else
 	LIBEVDEVINC := -I../
 endif
 
-ifeq ($(MESENOS),linux)
+ifneq ($(AGENT_BUILD),)
+	X11LIB :=
+else ifeq ($(MESENOS),linux)
 	X11LIB := -lX11
 else
 	X11LIB :=
@@ -209,6 +249,13 @@ ui: InteropDLL/$(OBJFOLDER)/$(SHAREDLIB)
 
 core: InteropDLL/$(OBJFOLDER)/$(SHAREDLIB)
 
+# Native, windowless command-line front-end for automation and AI agents.
+# This links to the same shared core as the UI and does not require .NET.
+agent: InteropDLL/$(OBJFOLDER)/$(SHAREDLIB) $(AGENTOBJ)
+	mkdir -p $(OUTFOLDER)
+	cp InteropDLL/$(OBJFOLDER)/$(SHAREDLIB) $(OUTFOLDER)/$(SHAREDLIB)
+	$(CXX) $(CXXFLAGS) -o $(OUTFOLDER)/mesen-agent $(AGENTOBJ) $(OUTFOLDER)/$(SHAREDLIB) $(AGENTRPATH)
+
 pgohelper: InteropDLL/$(OBJFOLDER)/$(SHAREDLIB)
 	mkdir -p PGOHelper/$(OBJFOLDER) && cd PGOHelper/$(OBJFOLDER) && $(CXX) $(CXXFLAGS) $(LINKCHECKUNRESOLVED) -o pgohelper ../PGOHelper.cpp ../../bin/pgohelperlib.so -pthread $(FSLIB) $(SDL2LIB) $(LIBEVDEVLIB) $(X11LIB)
 
@@ -218,13 +265,16 @@ pgohelper: InteropDLL/$(OBJFOLDER)/$(SHAREDLIB)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+%.agent.o: %.cpp
+	$(CXX) $(CXXFLAGS) -DMESEN_AGENT_HEADLESS -c $< -o $@
+
 %.o: %.mm
 	$(CXX) $(OBJCXXFLAGS) -c $< -o $@
 
 InteropDLL/$(OBJFOLDER)/$(SHAREDLIB): $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ) $(SDLOBJ) $(LIBEVDEVOBJ) $(LINUXOBJ) $(DLLOBJ) $(MACOSOBJ)
 	mkdir -p bin
 	mkdir -p InteropDLL/$(OBJFOLDER)
-	$(CXX) $(CXXFLAGS) $(LINKOPTIONS) $(LINKCHECKUNRESOLVED) -shared -o $(SHAREDLIB) $(DLLOBJ) $(SEVENZIPOBJ) $(LUAOBJ) $(LINUXOBJ) $(MACOSOBJ) $(LIBEVDEVOBJ) $(UTILOBJ) $(SDLOBJ) $(COREOBJ) $(SDL2INC) -pthread $(FSLIB) $(SDL2LIB) $(LIBEVDEVLIB) $(X11LIB)
+	$(CXX) $(CXXFLAGS) $(LINKOPTIONS) $(LINKCHECKUNRESOLVED) $(SHAREDID) -shared -o $(SHAREDLIB) $(DLLOBJ) $(SEVENZIPOBJ) $(LUAOBJ) $(LINUXOBJ) $(MACOSOBJ) $(LIBEVDEVOBJ) $(UTILOBJ) $(SDLOBJ) $(COREOBJ) $(SDL2INC) -pthread $(FSLIB) $(SDL2LIB) $(LIBEVDEVLIB) $(X11LIB)
 	cp $(SHAREDLIB) bin/pgohelperlib.so
 	mv $(SHAREDLIB) InteropDLL/$(OBJFOLDER)
 
@@ -243,3 +293,5 @@ clean:
 	rm -r -f $(LUAOBJ)
 	rm -r -f $(MACOSOBJ)
 	rm -r -f $(DLLOBJ)
+	rm -r -f $(AGENTOBJ)
+	rm -r -f $(DLLSRC:.cpp=.agent.o) $(AGENTSRC:.cpp=.agent.o)

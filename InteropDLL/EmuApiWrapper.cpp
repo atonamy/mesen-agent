@@ -7,6 +7,8 @@
 #include "Core/Shared/MessageManager.h"
 #include "Core/Shared/SaveStateManager.h"
 #include "Core/Shared/Interfaces/INotificationListener.h"
+#include "Core/Shared/Interfaces/IAudioDevice.h"
+#include "Core/Shared/Interfaces/IMouseManager.h"
 #include "Core/Shared/KeyManager.h"
 #include "Core/Shared/ShortcutKeyHandler.h"
 #include "Core/Shared/TimingInfo.h"
@@ -19,7 +21,10 @@
 #include "Utilities/StringUtilities.h"
 #include "InteropNotificationListeners.h"
 
-#ifdef _WIN32
+#if defined(MESEN_AGENT_HEADLESS)
+	//The native agent never creates host rendering, audio, keyboard, or mouse
+	//devices.  Keep desktop-only platform backends out of its runtime entirely.
+#elif defined(_WIN32)
 	#include "Windows/Renderer.h"
 	#include "Windows/SoundManager.h"
 	#include "Windows/WindowsKeyManager.h"
@@ -44,8 +49,10 @@ unique_ptr<IMouseManager> _mouseManager;
 unique_ptr<Emulator> _emu(new Emulator());
 bool _softwareRenderer = false;
 
-static void* _windowHandle = nullptr;
-static void* _viewerHandle = nullptr;
+#ifndef MESEN_AGENT_HEADLESS
+	static void* _windowHandle = nullptr;
+	static void* _viewerHandle = nullptr;
+#endif
 
 static constexpr char* _buildDateTime = __DATE__ ", " __TIME__;
 
@@ -81,6 +88,14 @@ extern "C" {
 	{
 		FolderUtilities::SetHomeFolder(homeFolder);
 
+		#ifdef MESEN_AGENT_HEADLESS
+			(void)windowHandle;
+			(void)viewerHandle;
+			(void)softwareRenderer;
+			(void)noAudio;
+			(void)noVideo;
+			(void)noInput;
+		#else
 		if(windowHandle != nullptr && viewerHandle != nullptr) {
 			_windowHandle = windowHandle;
 			_viewerHandle = viewerHandle;
@@ -123,6 +138,7 @@ extern "C" {
 				KeyManager::RegisterKeyManager(_keyManager.get());
 			}
 		}
+		#endif
 	}
 
 	DllExport void __stdcall SetExclusiveFullscreenMode(bool fullscreen, void *windowHandle)

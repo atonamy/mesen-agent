@@ -349,7 +349,7 @@
 {
 	"name": "setInput",
 	"category": "Input",
-	"description": "Sets the input state for the specified port. Buttons enabled or disabled via setInput will keep their state until the next inputPolled event.\n\nNote: If a button's value is not specified in the \"input\" argument, then the player retains control of that button. For example, \"emu.setInput({ select = false, start = false }, 0)\" will prevent the player 1 from using both the start and select buttons, but all other buttons will still work as normal.\n\nIt is recommended to use this function within a callback for the inputPolled event. Otherwise, the inputs may not be applied before the ROM has the chance to read them.",
+	"description": "Sets the input state for the specified port. Buttons enabled or disabled via setInput will keep their state until the next inputPolled event. When called outside an inputPolled callback, explicit button values are also queued and applied at the next inputPolled event so the ROM cannot miss them.\n\nNote: If a button's value is not specified in the \"input\" argument, then the player retains control of that button. For example, \"emu.setInput({ select = false, start = false }, 0)\" will prevent the player 1 from using both the start and select buttons, but all other buttons will still work as normal.\n\nFor state-dependent input automation, an inputPolled callback remains recommended because it runs at the exact point the ROM samples input.",
 	"parameters": [
 		{ "name": "input", "type": "Table", "description": "Controller state to apply to the port, same format as the return value of getInput()." },
 		{ "name": "port", "type": "Int", "description": "Port number" },
@@ -603,6 +603,7 @@
 
 		{ "name": "nesPrgRom", "description": "NES - PRG ROM" },
 		{ "name": "nesInternalRam", "description": "NES - System RAM" },
+		{ "name": "nesRam", "description": "NES - System RAM (compatibility alias for nesInternalRam)" },
 		{ "name": "nesWorkRam", "description": "NES - Work RAM" },
 		{ "name": "nesSaveRam", "description": "NES - Save RAM" },
 		{ "name": "nesNametableRam", "description": "NES - Nametable RAM (CIRAM)" },

@@ -53,6 +53,14 @@ namespace Mesen
 
 			Environment.CurrentDirectory = ConfigManager.HomeFolder;
 
+			//The test runner is a headless entry point and must never open the
+			//first-run wizard. Defaults are valid when settings.json is absent.
+			if(CommandLineHelper.IsTestRunner(args)) {
+				ConfigManager.LoadConfig();
+				DependencyHelper.ExtractNativeDependencies(ConfigManager.HomeFolder);
+				return TestRunner.Run(args);
+			}
+
 			if(!File.Exists(ConfigManager.GetConfigFile())) {
 				//Could not find configuration file, show wizard
 				DependencyHelper.ExtractNativeDependencies(ConfigManager.HomeFolder);
@@ -70,10 +78,6 @@ namespace Mesen
 
 			//Extract core dll & other native dependencies
 			DependencyHelper.ExtractNativeDependencies(ConfigManager.HomeFolder);
-
-			if(CommandLineHelper.IsTestRunner(args)) {
-				return TestRunner.Run(args);
-			}
 
 			using SingleInstance instance = SingleInstance.Instance;
 			instance.Init(args);

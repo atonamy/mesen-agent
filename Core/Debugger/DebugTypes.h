@@ -540,8 +540,24 @@ struct DebugControllerState
 	bool Select;
 	bool Start;
 
-	bool HasPressedButton()
+	bool HasPressedButton() const
 	{
 		return A || B || X || Y || L || R || U || D || Up || Down || Left || Right || Select || Start;
 	}
+
+	void Merge(const DebugControllerState& other)
+	{
+		A |= other.A; B |= other.B; X |= other.X; Y |= other.Y;
+		L |= other.L; R |= other.R; U |= other.U; D |= other.D;
+		Up |= other.Up; Down |= other.Down; Left |= other.Left; Right |= other.Right;
+		Select |= other.Select; Start |= other.Start;
+	}
+};
+
+struct DebugInputSchedule
+{
+	uint32_t Port;
+	DebugControllerState State;
+	uint32_t StartFrame;
+	uint32_t EndFrame;
 };

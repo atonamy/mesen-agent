@@ -590,8 +590,21 @@ void Debugger::ProcessEvent(EventType type, std::optional<CpuType> cpuTypeOpt)
 		default: break;
 
 		case EventType::InputPolled:
-			_debuggers[(int)evtCpuType].Debugger->ProcessInputOverrides(_inputOverrides);
+		{
+			DebugControllerState inputOverrides[8];
+			std::copy(std::begin(_inputOverrides), std::end(_inputOverrides), std::begin(inputOverrides));
+			uint32_t currentFrame = _emu->GetFrameCount();
+			if(currentFrame >= _inputScheduleStartFrame) {
+				uint32_t relativeFrame = currentFrame - _inputScheduleStartFrame;
+				for(const DebugInputSchedule& schedule : _inputSchedules) {
+					if(schedule.Port < 8 && relativeFrame >= schedule.StartFrame && relativeFrame <= schedule.EndFrame) {
+						inputOverrides[schedule.Port].Merge(schedule.State);
+					}
+				}
+			}
+			_debuggers[(int)evtCpuType].Debugger->ProcessInputOverrides(inputOverrides);
 			break;
+		}
 
 		case EventType::StartFrame: {
 			if(!_emu->IsDebuggerBlocked()) {
@@ -1036,6 +1049,16 @@ void Debugger::SetInputOverrides(uint32_t index, DebugControllerState state)
 	_inputOverrides[index] = state;
 }
 
+void Debugger::SetInputSchedules(DebugInputSchedule schedules[], uint32_t length, uint32_t startFrame)
+{
+	if(length == 0) {
+		_inputSchedules.clear();
+	} else {
+		_inputSchedules.assign(schedules, schedules + length);
+	}
+	_inputScheduleStartFrame = startFrame;
+}
+
 void Debugger::GetAvailableInputOverrides(uint8_t* availableIndexes)
 {
 	BaseControlManager* controlManager = _console->GetControlManager();
@@ -1052,7 +1075,9 @@ void Debugger::Log(string message)
 	}
 	_debuggerLog.push_back(message);
 
-	std::cout << message << std::endl;
+	if(_settings->CheckFlag(EmulationFlags::OutputToStdout)) {
+		std::cout << message << std::endl;
+	}
 }
 
 string Debugger::GetLog()

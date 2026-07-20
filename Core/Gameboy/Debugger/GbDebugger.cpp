@@ -475,14 +475,14 @@ void GbDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<GbController> controller = std::dynamic_pointer_cast<GbController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(GbController::Buttons::A, inputOverrides[i].A);
-			controller->SetBitValue(GbController::Buttons::B, inputOverrides[i].B);
-			controller->SetBitValue(GbController::Buttons::Select, inputOverrides[i].Select);
-			controller->SetBitValue(GbController::Buttons::Start, inputOverrides[i].Start);
-			controller->SetBitValue(GbController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(GbController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(GbController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(GbController::Buttons::Right, inputOverrides[i].Right);
+			if(inputOverrides[i].A) controller->SetBitValue(GbController::Buttons::A, true);
+			if(inputOverrides[i].B) controller->SetBitValue(GbController::Buttons::B, true);
+			if(inputOverrides[i].Select) controller->SetBitValue(GbController::Buttons::Select, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(GbController::Buttons::Start, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(GbController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(GbController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(GbController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(GbController::Buttons::Right, true);
 		}
 	}
 	controlManager->RefreshHubState();

@@ -19,6 +19,7 @@ build/
 [Oo]bj.x64/
 [Oo]bj.linux-*/
 [Oo]bj.osx-*/
+[Oo]bj.agent.*/
 
 # Enable "build/" folder in the NuGet Packages folder since NuGet packages use it for MSBuild targets
 !packages/*/build/
@@ -190,3 +191,7 @@ packages/*
 
 TestHelper/*
 UI/Dependencies.zip
+
+# Python test/cache artifacts
+__pycache__/
+*.py[cod]

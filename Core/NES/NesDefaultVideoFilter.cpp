@@ -78,6 +78,13 @@ void NesDefaultVideoFilter::GenerateFullColorPalette(uint32_t paletteBuffer[512]
 	}
 }
 
+void NesDefaultVideoFilter::InitializeDefaultPalette(NesConfig& nesConfig)
+{
+	memset(nesConfig.UserPalette, 0, sizeof(nesConfig.UserPalette));
+	memcpy(nesConfig.UserPalette, _ppuPaletteArgb[0], sizeof(_ppuPaletteArgb[0]));
+	nesConfig.IsFullColorPalette = false;
+}
+
 void NesDefaultVideoFilter::GetFullPalette(uint32_t palette[512], NesConfig& nesCfg, PpuModel model)
 {
 	if(model == PpuModel::Ppu2C02) {

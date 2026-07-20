@@ -481,14 +481,14 @@ void PceDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<PceController> controller = std::dynamic_pointer_cast<PceController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(PceController::Buttons::I, inputOverrides[i].A);
-			controller->SetBitValue(PceController::Buttons::II, inputOverrides[i].B);
-			controller->SetBitValue(PceController::Buttons::Select, inputOverrides[i].Select);
-			controller->SetBitValue(PceController::Buttons::Run, inputOverrides[i].Start);
-			controller->SetBitValue(PceController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(PceController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(PceController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(PceController::Buttons::Right, inputOverrides[i].Right);
+			if(inputOverrides[i].A) controller->SetBitValue(PceController::Buttons::I, true);
+			if(inputOverrides[i].B) controller->SetBitValue(PceController::Buttons::II, true);
+			if(inputOverrides[i].Select) controller->SetBitValue(PceController::Buttons::Select, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(PceController::Buttons::Run, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(PceController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(PceController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(PceController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(PceController::Buttons::Right, true);
 		}
 	}
 	controlManager->RefreshHubState();

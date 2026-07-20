@@ -175,6 +175,8 @@ int LuaApi::GetLibrary(lua_State *lua)
 		}
 		LuaPushIntValue(lua, name, (int)entry.first);
 	}
+	//Compatibility alias used by FCEUX scripts and other NES automation tools.
+	LuaPushIntValue(lua, "nesRam", (int)MemoryType::NesInternalRam);
 	lua_settable(lua, -3);
 
 	GenerateEnumDefinition<CallbackType>(lua, "callbackType");
@@ -235,7 +237,7 @@ int LuaApi::SelectDrawSurface(lua_State* lua)
 int LuaApi::GetMemorySize(lua_State* lua)
 {
 	LuaCallHelper l(lua);
-	MemoryType memType = (MemoryType)l.ReadInteger();
+	MemoryType memType = (MemoryType)l.ReadRequiredInteger("memoryType");
 	checkEnum(MemoryType, memType, "invalid memory type");
 	l.Return(_memoryDumper->GetMemorySize(memType));
 	return l.ReturnCount();
@@ -246,10 +248,10 @@ int LuaApi::ReadMemory(lua_State *lua)
 	LuaCallHelper l(lua);
 	l.ForceParamCount(3);
 	bool returnSignedValue = l.ReadBool();
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int address = l.ReadInteger();
+	int address = l.ReadRequiredInteger("address");
 	checkminparams(2);
 	errorCond(address < 0, "address must be >= 0");
 	checkEnum(MemoryType, memType, "invalid memory type");
@@ -261,11 +263,11 @@ int LuaApi::ReadMemory(lua_State *lua)
 int LuaApi::WriteMemory(lua_State *lua)
 {
 	LuaCallHelper l(lua);
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int value = l.ReadInteger();
-	int address = l.ReadInteger();
+	int value = l.ReadRequiredInteger("value");
+	int address = l.ReadRequiredInteger("address");
 	checkparams();
 	errorCond(value > 255 || value < -128, "value out of range");
 	errorCond(address < 0, "address must be >= 0");
@@ -279,10 +281,10 @@ int LuaApi::ReadMemory16(lua_State *lua)
 	LuaCallHelper l(lua);
 	l.ForceParamCount(3);
 	bool returnSignedValue = l.ReadBool();
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int address = l.ReadInteger();
+	int address = l.ReadRequiredInteger("address");
 	checkminparams(2);
 	errorCond(address < 0, "address must be >= 0");
 	checkEnum(MemoryType, memType, "invalid memory type");
@@ -296,10 +298,10 @@ int LuaApi::ReadMemory32(lua_State* lua)
 	LuaCallHelper l(lua);
 	l.ForceParamCount(3);
 	bool returnSignedValue = l.ReadBool();
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int address = l.ReadInteger();
+	int address = l.ReadRequiredInteger("address");
 	checkminparams(2);
 	errorCond(address < 0, "address must be >= 0");
 	checkEnum(MemoryType, memType, "invalid memory type");
@@ -311,11 +313,11 @@ int LuaApi::ReadMemory32(lua_State* lua)
 int LuaApi::WriteMemory16(lua_State *lua)
 {
 	LuaCallHelper l(lua);
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int value = l.ReadInteger();
-	int address = l.ReadInteger();
+	int value = l.ReadRequiredInteger("value");
+	int address = l.ReadRequiredInteger("address");
 	checkparams();
 	errorCond(value > 65535 || value < -32768, "value out of range");
 	errorCond(address < 0, "address must be >= 0");
@@ -327,11 +329,11 @@ int LuaApi::WriteMemory16(lua_State *lua)
 int LuaApi::WriteMemory32(lua_State* lua)
 {
 	LuaCallHelper l(lua);
-	int type = l.ReadInteger();
+	int type = l.ReadRequiredInteger("memoryType");
 	bool disableSideEffects = (type & 0x100) == 0x100;
 	MemoryType memType = (MemoryType)(type & 0xFF);
-	int value = l.ReadInteger();
-	int address = l.ReadInteger();
+	int value = l.ReadRequiredInteger("value");
+	int address = l.ReadRequiredInteger("address");
 	checkparams();
 	errorCond(address < 0, "address must be >= 0");
 	checkEnum(MemoryType, memType, "invalid memory type");
@@ -810,6 +812,7 @@ int LuaApi::TakeScreenshot(lua_State *lua)
 	LuaCallHelper l(lua);
 	checkparams();
 	stringstream ss;
+	_emu->GetVideoDecoder()->WaitForAsyncFrameDecode();
 	_emu->GetVideoDecoder()->TakeScreenshot(ss);
 	l.Return(ss.str());
 	return l.ReturnCount();
@@ -895,11 +898,17 @@ int LuaApi::SetInput(lua_State* lua)
 					pos.Y = (int16_t)btnState.Value;
 					controller->SetCoordinates(pos);
 				}
+				if(!_context->IsInputPolledEvent()) {
+					_context->QueueInputOverride(port, subport, btn.ButtonId, true, btnState.Value);
+				}
 			}
 		} else {
 			Nullable<bool> btnState = l.ReadOptionalBool();
 			if(btnState.HasValue) {
 				controller->SetBitValue(btn.ButtonId, btnState.Value);
+				if(!_context->IsInputPolledEvent()) {
+					_context->QueueInputOverride(port, subport, btn.ButtonId, false, btnState.Value ? 1 : 0);
+				}
 			}
 		}
 	}

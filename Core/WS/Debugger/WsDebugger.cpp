@@ -497,18 +497,18 @@ void WsDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<WsController> controller = std::dynamic_pointer_cast<WsController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(WsController::Buttons::A, inputOverrides[i].A);
-			controller->SetBitValue(WsController::Buttons::B, inputOverrides[i].B);
-			controller->SetBitValue(WsController::Buttons::Start, inputOverrides[i].Start);
-			controller->SetBitValue(WsController::Buttons::Sound, inputOverrides[i].Select);
-			controller->SetBitValue(WsController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(WsController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(WsController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(WsController::Buttons::Right, inputOverrides[i].Right);
-			controller->SetBitValue(WsController::Buttons::Up2, inputOverrides[i].U);
-			controller->SetBitValue(WsController::Buttons::Down2, inputOverrides[i].D);
-			controller->SetBitValue(WsController::Buttons::Left2, inputOverrides[i].L);
-			controller->SetBitValue(WsController::Buttons::Right2, inputOverrides[i].R);
+			if(inputOverrides[i].A) controller->SetBitValue(WsController::Buttons::A, true);
+			if(inputOverrides[i].B) controller->SetBitValue(WsController::Buttons::B, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(WsController::Buttons::Start, true);
+			if(inputOverrides[i].Select) controller->SetBitValue(WsController::Buttons::Sound, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(WsController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(WsController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(WsController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(WsController::Buttons::Right, true);
+			if(inputOverrides[i].U) controller->SetBitValue(WsController::Buttons::Up2, true);
+			if(inputOverrides[i].D) controller->SetBitValue(WsController::Buttons::Down2, true);
+			if(inputOverrides[i].L) controller->SetBitValue(WsController::Buttons::Left2, true);
+			if(inputOverrides[i].R) controller->SetBitValue(WsController::Buttons::Right2, true);
 		}
 	}
 	controlManager->RefreshHubState();

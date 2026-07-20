@@ -11,7 +11,10 @@
 #include "Shared/Video/SoftwareRenderer.h"
 #include "InteropNotificationListeners.h"
 
-#ifdef _WIN32
+#if defined(MESEN_AGENT_HEADLESS)
+	//History inspection remains available through the software renderer without
+	//linking host UI/audio backends into the agent runtime.
+#elif defined(_WIN32)
 	#include "Windows/Renderer.h"
 	#include "Windows/SoundManager.h"
 #elif __APPLE__
@@ -62,6 +65,11 @@ extern "C"
 
 		_historyPlayer->GetSettings()->GetEmulationConfig().EmulationSpeed = 100;
 
+		#ifdef MESEN_AGENT_HEADLESS
+			(void)windowHandle;
+			(void)viewerHandle;
+			_historyRenderer.reset(new SoftwareRenderer(_historyPlayer.get()));
+		#else
 		if(_softwareRenderer) {
 			_historyRenderer.reset(new SoftwareRenderer(_historyPlayer.get()));
 		} else {
@@ -80,6 +88,7 @@ extern "C"
 			_historySoundManager.reset(new SdlSoundManager(_historyPlayer.get()));
 		#else
 			_historySoundManager.reset(new SdlSoundManager(_historyPlayer.get()));
+		#endif
 		#endif
 	}
 
