@@ -538,14 +538,14 @@ void NesDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<NesController> controller = std::dynamic_pointer_cast<NesController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(NesController::Buttons::A, inputOverrides[i].A);
-			controller->SetBitValue(NesController::Buttons::B, inputOverrides[i].B);
-			controller->SetBitValue(NesController::Buttons::Select, inputOverrides[i].Select);
-			controller->SetBitValue(NesController::Buttons::Start, inputOverrides[i].Start);
-			controller->SetBitValue(NesController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(NesController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(NesController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(NesController::Buttons::Right, inputOverrides[i].Right);
+			if(inputOverrides[i].A) controller->SetBitValue(NesController::Buttons::A, true);
+			if(inputOverrides[i].B) controller->SetBitValue(NesController::Buttons::B, true);
+			if(inputOverrides[i].Select) controller->SetBitValue(NesController::Buttons::Select, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(NesController::Buttons::Start, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(NesController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(NesController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(NesController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(NesController::Buttons::Right, true);
 		}
 	}
 	controlManager->RefreshHubState();

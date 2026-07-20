@@ -1,6 +1,5 @@
 #include "pch.h"
 #include <algorithm>
-#include <regex>
 #include "Lua/lua.hpp"
 #include "Lua/luasocket.hpp"
 #include "Debugger/ScriptingContext.h"
@@ -12,11 +11,15 @@
 #include "Shared/Emulator.h"
 #include "Shared/EmuSettings.h"
 #include "Shared/EventType.h"
+#include "Shared/BaseControlDevice.h"
+#include "Shared/BaseControlManager.h"
+#include "Shared/Interfaces/IConsole.h"
 #include "Shared/SaveStateManager.h"
 #include "Utilities/magic_enum.hpp"
 #include "Utilities/StringUtilities.h"
 
 ScriptingContext* ScriptingContext::_context = nullptr;
+bool ScriptingContext::_breakOnError = false;
 
 ScriptingContext::ScriptingContext(Debugger *debugger)
 {
@@ -64,13 +67,14 @@ bool ScriptingContext::LoadScript(string scriptName, string path, string scriptC
 
 	EmuSettings* settings = debugger->GetEmulator()->GetSettings();
 	bool allowIoOsAccess = settings->GetDebugConfig().ScriptAllowIoOsAccess;
-	LuaOpenLibs(_lua, allowIoOsAccess);
+	bool allowNetworkAccess = settings->GetDebugConfig().ScriptAllowNetworkAccess;
+	LuaOpenLibs(_lua, allowIoOsAccess, allowNetworkAccess);
 
 	//Prevent lua code from loading any files
 	SANDBOX_ALLOW_LOADFILE = allowIoOsAccess ? 1 : 0;
 
 	//Load LuaSocket into Lua core
-	if(allowIoOsAccess && settings->GetDebugConfig().ScriptAllowNetworkAccess) {
+	if(allowNetworkAccess) {
 		lua_getglobal(_lua, "package");
 		lua_getfield(_lua, -1, "preload");
 		lua_pushcfunction(_lua, luaopen_socket_core);
@@ -78,17 +82,33 @@ bool ScriptingContext::LoadScript(string scriptName, string path, string scriptC
 		lua_pushcfunction(_lua, luaopen_mime_core);
 		lua_setfield(_lua, -2, "mime.core");
 		lua_pop(_lua, 2);
+
+		if(!allowIoOsAccess) {
+			//Network-only access needs package/require for the preloaded socket
+			//modules, but must not expose native dynamic-library loading.
+			lua_getglobal(_lua, "package");
+			lua_pushnil(_lua);
+			lua_setfield(_lua, -2, "loadlib");
+			lua_pushliteral(_lua, "");
+			lua_setfield(_lua, -2, "cpath");
+			lua_pop(_lua, 1);
+		}
 	}
 
 	if(allowIoOsAccess) {
-		//Escape backslashes
-		std::regex r("\\\\");
-		path = std::regex_replace(path, r, "\\\\");
-
 		//Add path for the current Lua script to package.path to allow
 		//using require() without specifying an absolute path, etc.
-		string cmd = "package.path = package.path .. ';" + path + "?.lua'";
-		luaL_dostring(_lua, cmd.c_str());
+		if(!path.empty() && path.back() != '/' && path.back() != '\\') {
+			path += '/';
+		}
+		lua_getglobal(_lua, "package");
+		lua_getfield(_lua, -1, "path");
+		const char* existingPath = lua_tostring(_lua, -1);
+		string packagePath = (existingPath ? existingPath : "") + string(";") + path + "?.lua";
+		lua_pop(_lua, 1);
+		lua_pushlstring(_lua, packagePath.c_str(), packagePath.size());
+		lua_setfield(_lua, -2, "path");
+		lua_pop(_lua, 1);
 	}
 
 	luaL_requiref(_lua, "emu", LuaApi::GetLibrary, 1);
@@ -104,7 +124,7 @@ bool ScriptingContext::LoadScript(string scriptName, string path, string scriptC
 		}
 	}
 
-	if(lua_isstring(_lua, -1)) {
+	if(lua_gettop(_lua) > 0) {
 		ProcessLuaError();
 	}
 	return false;
@@ -112,15 +132,25 @@ bool ScriptingContext::LoadScript(string scriptName, string path, string scriptC
 
 void ScriptingContext::ProcessLuaError()
 {
-	string errorMsg = lua_tostring(_lua, -1);
+	_errorCount++;
+	const char* errorText = lua_tostring(_lua, -1);
+	string errorMsg = errorText ? errorText : string("Lua error object of type '") + luaL_typename(_lua, -1) + "'";
 	if(StringUtilities::Contains(errorMsg, "attempt to call a nil value (global 'require')") || StringUtilities::Contains(errorMsg, "attempt to index a nil value (global 'os')") || StringUtilities::Contains(errorMsg, "attempt to index a nil value (global 'io')")) {
-		Log("I/O and OS libraries are disabled by default for security.\nYou can enable them here:\nScript->Settings->Script Window->Restrictions->Allow access to I/O and OS functions.");
+		Log("I/O and OS libraries are disabled by default for security. Enable them in script settings or pass --lua-allow-io to mesen-agent.");
 	} else if(StringUtilities::Contains(errorMsg, "module 'socket.core' not found")) {
-		Log("Lua sockets are disabled by default for security.\nYou can enable them here:\nScript->Settings->Script Window->Restrictions->Allow network access.");
+		Log("Lua sockets are disabled by default for security. Enable them in script settings or pass --lua-allow-network to mesen-agent.");
 	} else {
 		Log(errorMsg);
 	}
 	lua_pop(_lua, 1);
+
+	//The desktop script window keeps running after callback errors so users can
+	//edit/reload scripts interactively.  The native agent opts into fail-fast
+	//behavior: stop at the next operation while preserving the console and
+	//debugger state for inspection and artifact capture.
+	if(_breakOnError && _initDone) {
+		_debugger->Step(_defaultCpuType, 1, StepType::Step);
+	}
 }
 
 void ScriptingContext::ExecutionCountHook(lua_State* lua)
@@ -132,7 +162,7 @@ void ScriptingContext::ExecutionCountHook(lua_State* lua)
 	lua_setwatchdogtimer(lua, ScriptingContext::ExecutionCountHook, 1000);
 }
 
-void ScriptingContext::LuaOpenLibs(lua_State* L, bool allowIoOsAccess)
+void ScriptingContext::LuaOpenLibs(lua_State* L, bool allowIoOsAccess, bool allowNetworkAccess)
 {
 	constexpr luaL_Reg loadedlibs[] = {
 	  {"_G", luaopen_base},
@@ -153,7 +183,7 @@ void ScriptingContext::LuaOpenLibs(lua_State* L, bool allowIoOsAccess)
 	for(lib = loadedlibs; lib->func; lib++) {
 		if(!allowIoOsAccess) {
 			//Skip loading IO, OS and Package lib when sandboxed
-			if(strcmp(lib->name, LUA_IOLIBNAME) == 0 || strcmp(lib->name, LUA_OSLIBNAME) == 0 || strcmp(lib->name, LUA_LOADLIBNAME) == 0) {
+			if(strcmp(lib->name, LUA_IOLIBNAME) == 0 || strcmp(lib->name, LUA_OSLIBNAME) == 0 || (strcmp(lib->name, LUA_LOADLIBNAME) == 0 && !allowNetworkAccess)) {
 				continue;
 			}
 		}
@@ -336,6 +366,9 @@ void ScriptingContext::InternalCallMemoryCallback(AddressInfo relAddr, T& value,
 
 int ScriptingContext::CallEventCallback(EventType type, CpuType cpuType)
 {
+	if(type == EventType::InputPolled) {
+		ApplyPendingInputOverrides();
+	}
 	if(_eventCallbacks[(int)type].empty()) {
 		return 0;
 	}
@@ -345,6 +378,7 @@ int ScriptingContext::CallEventCallback(EventType type, CpuType cpuType)
 	lua_setwatchdogtimer(_lua, ScriptingContext::ExecutionCountHook, 1000);
 	LuaApi::SetContext(this);
 	LuaCallHelper l(_lua);
+	_currentEvent = type;
 	for(int& ref : _eventCallbacks[(int)type]) {
 		lua_rawgeti(_lua, LUA_REGISTRYINDEX, ref);
 		lua_pushinteger(_lua, (int)cpuType);
@@ -352,7 +386,41 @@ int ScriptingContext::CallEventCallback(EventType type, CpuType cpuType)
 			ProcessLuaError();
 		}
 	}
+	_currentEvent = EventType::LastValue;
 	return l.ReturnCount();
+}
+
+void ScriptingContext::QueueInputOverride(int port, int subPort, int buttonId, bool isNumeric, int32_t value)
+{
+	_pendingInputOverrides.push_back({ port, subPort, buttonId, isNumeric, value });
+}
+
+void ScriptingContext::ApplyPendingInputOverrides()
+{
+	if(_pendingInputOverrides.empty()) {
+		return;
+	}
+
+	BaseControlManager* controlManager = _debugger->GetEmulator()->GetConsoleUnsafe()->GetControlManager();
+	for(const ScriptInputOverride& input : _pendingInputOverrides) {
+		shared_ptr<BaseControlDevice> controller = controlManager->GetControlDevice(input.Port, input.SubPort);
+		if(!controller) {
+			continue;
+		}
+
+		if(input.IsNumeric) {
+			MousePosition pos = controller->GetCoordinates();
+			if(input.ButtonId == BaseControlDevice::DeviceXCoordButtonId) {
+				pos.X = (int16_t)input.Value;
+			} else if(input.ButtonId == BaseControlDevice::DeviceYCoordButtonId) {
+				pos.Y = (int16_t)input.Value;
+			}
+			controller->SetCoordinates(pos);
+		} else {
+			controller->SetBitValue(input.ButtonId, input.Value != 0);
+		}
+	}
+	_pendingInputOverrides.clear();
 }
 
 template void ScriptingContext::CallMemoryCallback<uint8_t>(AddressInfo relAddr, uint8_t& value, CallbackType type, CpuType cpuType);

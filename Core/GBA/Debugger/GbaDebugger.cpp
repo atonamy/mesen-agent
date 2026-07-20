@@ -465,16 +465,16 @@ void GbaDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<GbaController> controller = std::dynamic_pointer_cast<GbaController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(GbaController::Buttons::A, inputOverrides[i].A);
-			controller->SetBitValue(GbaController::Buttons::B, inputOverrides[i].B);
-			controller->SetBitValue(GbaController::Buttons::Select, inputOverrides[i].Select);
-			controller->SetBitValue(GbaController::Buttons::Start, inputOverrides[i].Start);
-			controller->SetBitValue(GbaController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(GbaController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(GbaController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(GbaController::Buttons::Right, inputOverrides[i].Right);
-			controller->SetBitValue(GbaController::Buttons::L, inputOverrides[i].L);
-			controller->SetBitValue(GbaController::Buttons::R, inputOverrides[i].R);
+			if(inputOverrides[i].A) controller->SetBitValue(GbaController::Buttons::A, true);
+			if(inputOverrides[i].B) controller->SetBitValue(GbaController::Buttons::B, true);
+			if(inputOverrides[i].Select) controller->SetBitValue(GbaController::Buttons::Select, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(GbaController::Buttons::Start, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(GbaController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(GbaController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(GbaController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(GbaController::Buttons::Right, true);
+			if(inputOverrides[i].L) controller->SetBitValue(GbaController::Buttons::L, true);
+			if(inputOverrides[i].R) controller->SetBitValue(GbaController::Buttons::R, true);
 		}
 	}
 	controlManager->RefreshHubState();

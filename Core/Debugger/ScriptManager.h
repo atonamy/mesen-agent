@@ -18,6 +18,9 @@ private:
 	bool _isCpuMemoryCallbackEnabled = false;
 	bool _isPpuMemoryCallbackEnabled = false;
 	vector<unique_ptr<ScriptHost>> _scripts;
+	static unordered_map<int32_t, string> _archivedLogs;
+	static unordered_map<int32_t, uint32_t> _archivedErrorCounts;
+	static SimpleLock _archivedLogLock;
 	
 	void RefreshMemoryCallbackFlags();
 
@@ -29,6 +32,9 @@ public:
 	int32_t LoadScript(string name, string path, string content, int32_t scriptId);
 	void RemoveScript(int32_t scriptId);
 	string GetScriptLog(int32_t scriptId);
+	uint32_t GetScriptErrorCount(int32_t scriptId);
+	static string GetArchivedScriptLog(int32_t scriptId);
+	static uint32_t GetArchivedScriptErrorCount(int32_t scriptId);
 	void ProcessEvent(EventType type, CpuType cpuType);
 
 	void EnableCpuMemoryCallbacks() { _isCpuMemoryCallbackEnabled = true; }

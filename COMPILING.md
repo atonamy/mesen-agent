@@ -20,3 +20,9 @@ To compile with GCC instead, use `USE_GCC=true make`.
 To build macOS, install SDL2 (i.e via Homebrew) and the [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0).  
 
 Once SDL2 and the .NET 8 SDK are installed, run `make`.
+
+## Headless agent CLI
+
+To build only the native terminal toolkit (no .NET SDK or Avalonia required),
+run `make agent`. The executable and `MesenCore` shared library are written to
+`bin/<platform>/Release/`.

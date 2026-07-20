@@ -93,6 +93,22 @@ uint32_t LuaCallHelper::ReadInteger(uint32_t defaultValue)
 	return value;
 }
 
+uint32_t LuaCallHelper::ReadRequiredInteger(const char* paramName)
+{
+	_paramCount++;
+	uint32_t value;
+	if(lua_isinteger(_lua, -1)) {
+		value = (uint32_t)lua_tointeger(_lua, -1);
+	} else if(lua_isnumber(_lua, -1)) {
+		value = (uint32_t)lua_tonumber(_lua, -1);
+	} else {
+		luaL_error(_lua, "%s must be a number (a memory enum name may be invalid)", paramName);
+		return 0;
+	}
+	lua_pop(_lua, 1);
+	return value;
+}
+
 string LuaCallHelper::ReadString()
 {
 	_paramCount++;

@@ -88,6 +88,7 @@ extern "C"
 	DllExport void __stdcall SetBreakpoints(Breakpoint breakpoints[], uint32_t length) { WithDebugger(void, SetBreakpoints(breakpoints, length)); }
 	
 	DllExport void __stdcall SetInputOverrides(uint32_t index, DebugControllerState state) { WithDebugger(void, SetInputOverrides(index, state)); }
+	DllExport void __stdcall SetInputSchedules(DebugInputSchedule schedules[], uint32_t length, uint32_t startFrame) { WithDebugger(void, SetInputSchedules(schedules, length, startFrame)); }
 	DllExport void __stdcall GetAvailableInputOverrides(uint8_t* availableIndexes) { WithDebugger(void, GetAvailableInputOverrides(availableIndexes)); }
 	
 	DllExport void __stdcall GetTokenList(CpuType cpuType, char* tokenList) { WithDebugger(void, GetTokenList(cpuType, tokenList)); }
@@ -189,7 +190,16 @@ extern "C"
 	DllExport void __stdcall GetScriptLog(int32_t scriptId, char* outScriptLog, uint32_t maxLength)
 	{
 		string log = WithTool(string, GetScriptManager(), GetScriptLog(scriptId));
+		if(log.empty()) {
+			log = ScriptManager::GetArchivedScriptLog(scriptId);
+		}
 		StringUtilities::CopyToBuffer(log, outScriptLog, maxLength);
+	}
+
+	DllExport uint32_t __stdcall GetScriptErrorCount(int32_t scriptId)
+	{
+		uint32_t count = WithTool(uint32_t, GetScriptManager(), GetScriptErrorCount(scriptId));
+		return count > 0 ? count : ScriptManager::GetArchivedScriptErrorCount(scriptId);
 	}
 
 	DllExport uint32_t __stdcall AssembleCode(CpuType cpuType, char* code, uint32_t startAddress, int16_t* assembledOutput) { return WithTool(uint32_t, GetAssembler(cpuType), AssembleCode(code, startAddress, assembledOutput)); }

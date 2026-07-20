@@ -1,0 +1,5 @@
+local socket = require("socket.core")
+assert(type(socket) == "table", "socket.core did not load")
+assert(io == nil and os == nil, "network permission unexpectedly enabled IO/OS")
+assert(package.loadlib == nil and package.cpath == "", "network permission exposed native library loading")
+emu.log("network library loaded without IO/OS")

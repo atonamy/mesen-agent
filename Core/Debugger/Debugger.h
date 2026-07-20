@@ -83,6 +83,8 @@ private:
 	atomic<uint32_t> _suspendRequestCount;
 
 	DebugControllerState _inputOverrides[8] = {};
+	vector<DebugInputSchedule> _inputSchedules;
+	uint32_t _inputScheduleStartFrame = 0;
 
 	bool _waitForBreakResume = false;
 	
@@ -171,6 +173,7 @@ public:
 	void SetBreakpoints(Breakpoint breakpoints[], uint32_t length);
 
 	void SetInputOverrides(uint32_t index, DebugControllerState state);
+	void SetInputSchedules(DebugInputSchedule schedules[], uint32_t length, uint32_t startFrame);
 	void GetAvailableInputOverrides(uint8_t* availableIndexes);
 	
 	void Log(string message);

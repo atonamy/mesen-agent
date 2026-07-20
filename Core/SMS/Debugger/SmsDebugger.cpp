@@ -473,13 +473,13 @@ void SmsDebugger::ProcessInputOverrides(DebugControllerState inputOverrides[8])
 	for(int i = 0; i < 8; i++) {
 		shared_ptr<SmsController> controller = std::dynamic_pointer_cast<SmsController>(controlManager->GetControlDeviceByIndex(i));
 		if(controller && inputOverrides[i].HasPressedButton()) {
-			controller->SetBitValue(SmsController::Buttons::A, inputOverrides[i].A);
-			controller->SetBitValue(SmsController::Buttons::B, inputOverrides[i].B);
-			controller->SetBitValue(SmsController::Buttons::Pause, inputOverrides[i].Start);
-			controller->SetBitValue(SmsController::Buttons::Up, inputOverrides[i].Up);
-			controller->SetBitValue(SmsController::Buttons::Down, inputOverrides[i].Down);
-			controller->SetBitValue(SmsController::Buttons::Left, inputOverrides[i].Left);
-			controller->SetBitValue(SmsController::Buttons::Right, inputOverrides[i].Right);
+			if(inputOverrides[i].A) controller->SetBitValue(SmsController::Buttons::A, true);
+			if(inputOverrides[i].B) controller->SetBitValue(SmsController::Buttons::B, true);
+			if(inputOverrides[i].Start) controller->SetBitValue(SmsController::Buttons::Pause, true);
+			if(inputOverrides[i].Up) controller->SetBitValue(SmsController::Buttons::Up, true);
+			if(inputOverrides[i].Down) controller->SetBitValue(SmsController::Buttons::Down, true);
+			if(inputOverrides[i].Left) controller->SetBitValue(SmsController::Buttons::Left, true);
+			if(inputOverrides[i].Right) controller->SetBitValue(SmsController::Buttons::Right, true);
 		}
 	}
 	controlManager->RefreshHubState();
