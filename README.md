@@ -25,7 +25,7 @@ Mesen's emulation core.
 
 ## Install
 
-### Install the latest CLI release
+### Fast install of the latest CLI release
 
 Linux and macOS:
 
@@ -56,27 +56,158 @@ You can also download an archive directly from
 Each release contains only `mesen-agent`, the matching Mesen core runtime,
 licenses, and checksums—no Avalonia UI or .NET application.
 
+### Install directly from a GitHub release
+
+The release asset must match the host operating system and CPU:
+
+| Host | Release asset |
+|---|---|
+| macOS Apple silicon | `mesen-agent-macos-arm64.tar.gz` |
+| macOS Intel | `mesen-agent-macos-x64.tar.gz` |
+| Linux arm64 | `mesen-agent-linux-arm64.tar.gz` |
+| Linux x86-64 | `mesen-agent-linux-x64.tar.gz` |
+| Windows x86-64 | `mesen-agent-windows-x64.zip` |
+
+The following commands download from GitHub Releases, verify the published
+checksum, and install into the location used by the agent skill.
+
+macOS, automatically selecting Apple silicon or Intel:
+
+```sh
+INSTALL_DIR="$HOME/.local/bin"
+WORK_DIR="$(mktemp -d)"
+case "$(uname -m)" in
+  arm64|aarch64) ASSET=mesen-agent-macos-arm64.tar.gz ;;
+  x86_64|amd64) ASSET=mesen-agent-macos-x64.tar.gz ;;
+  *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+BASE_URL=https://github.com/atonamy/mesen-agent/releases/latest/download
+curl -fL "$BASE_URL/$ASSET" -o "$WORK_DIR/$ASSET"
+curl -fL "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS"
+(cd "$WORK_DIR" && grep " $ASSET$" SHA256SUMS | shasum -a 256 -c -)
+tar -xzf "$WORK_DIR/$ASSET" -C "$WORK_DIR"
+mkdir -p "$INSTALL_DIR"
+install -m 755 "$WORK_DIR/mesen-agent" "$INSTALL_DIR/mesen-agent"
+install -m 755 "$WORK_DIR/MesenCore.dylib" "$INSTALL_DIR/MesenCore.dylib"
+"$INSTALL_DIR/mesen-agent" --help
+```
+
+Linux, automatically selecting arm64 or x86-64:
+
+```sh
+INSTALL_DIR="$HOME/.local/bin"
+WORK_DIR="$(mktemp -d)"
+case "$(uname -m)" in
+  arm64|aarch64) ASSET=mesen-agent-linux-arm64.tar.gz ;;
+  x86_64|amd64) ASSET=mesen-agent-linux-x64.tar.gz ;;
+  *) echo "Unsupported Linux architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+BASE_URL=https://github.com/atonamy/mesen-agent/releases/latest/download
+curl -fL "$BASE_URL/$ASSET" -o "$WORK_DIR/$ASSET"
+curl -fL "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS"
+(cd "$WORK_DIR" && grep " $ASSET$" SHA256SUMS | sha256sum -c -)
+tar -xzf "$WORK_DIR/$ASSET" -C "$WORK_DIR"
+mkdir -p "$INSTALL_DIR"
+install -m 755 "$WORK_DIR/mesen-agent" "$INSTALL_DIR/mesen-agent"
+install -m 755 "$WORK_DIR/MesenCore.so" "$INSTALL_DIR/MesenCore.so"
+"$INSTALL_DIR/mesen-agent" --help
+```
+
+Windows x64 PowerShell:
+
+```powershell
+$Asset = "mesen-agent-windows-x64.zip"
+$BaseUrl = "https://github.com/atonamy/mesen-agent/releases/latest/download"
+$WorkDir = Join-Path ([IO.Path]::GetTempPath()) ("mesen-agent-" + [guid]::NewGuid())
+$InstallDir = Join-Path $HOME ".local\bin"
+New-Item -ItemType Directory -Force $WorkDir, $InstallDir | Out-Null
+Invoke-WebRequest "$BaseUrl/$Asset" -OutFile "$WorkDir/$Asset"
+Invoke-WebRequest "$BaseUrl/SHA256SUMS" -OutFile "$WorkDir/SHA256SUMS"
+$ChecksumLine = Get-Content "$WorkDir/SHA256SUMS" |
+  Where-Object { $_ -match " $([regex]::Escape($Asset))$" }
+if (-not $ChecksumLine) { throw "Checksum for $Asset was not published" }
+$Expected = ($ChecksumLine -split '\s+')[0].ToLowerInvariant()
+$Actual = (Get-FileHash "$WorkDir/$Asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($Actual -ne $Expected) { throw "mesen-agent release checksum mismatch" }
+Expand-Archive "$WorkDir/$Asset" -DestinationPath "$WorkDir/extracted" -Force
+Copy-Item "$WorkDir/extracted/mesen-agent.exe" $InstallDir -Force
+Copy-Item "$WorkDir/extracted/MesenCore.dll" $InstallDir -Force
+& "$InstallDir/mesen-agent.exe" --help
+```
+
+Add `$HOME/.local/bin` to the shell `PATH` after installation, but keep the
+binary and matching `MesenCore` library together in that directory.
+
 ### Install the AI-agent skill from GitHub
 
 The repository uses the open Agent Skills layout, so the standard skills CLI
 discovers and installs it directly from GitHub:
 
-```sh
-npx skills add atonamy/mesen-agent --skill mesen-agent -g -y
-```
-
-To target particular coding agents explicitly:
+First verify that GitHub discovery finds the skill, then install it globally for
+all supported coding agents:
 
 ```sh
-npx skills add atonamy/mesen-agent --skill mesen-agent -g -y \
-  -a codex -a claude-code -a pi -a universal
+npx --yes skills@latest add atonamy/mesen-agent --list
+npx --yes skills@latest add atonamy/mesen-agent \
+  --skill mesen-agent --agent '*' --global --yes
 ```
 
-Use `npx skills add atonamy/mesen-agent --list` to verify discovery before
-installing. The skill lives at `skills/mesen-agent`, follows the portable
-`SKILL.md` convention, always instructs agents to invoke
+The second command installs the canonical copy under
+`$HOME/.agents/skills/mesen-agent` and wires supported clients such as Codex,
+Claude Code, and Pi to it. Verify the registrations with:
+
+```sh
+npx --yes skills@latest list --global --json
+```
+
+The skill lives at `skills/mesen-agent`, follows the portable `SKILL.md`
+convention, always instructs agents to invoke
 `$HOME/.local/bin/mesen-agent`, and includes the full CLI contract plus advanced
 debugging examples.
+
+### Prompt examples for coding agents
+
+After installing the binary and skill, ask an agent to use the skill explicitly.
+These prompts are designed to produce commands, machine-readable evidence, and
+reproducible artifacts rather than opening a GUI.
+
+Investigate why a game does not leave its title screen:
+
+```text
+Use the mesen-agent skill and $HOME/.local/bin/mesen-agent. Do not open any GUI.
+Run build/game.nes in an isolated home, press Start deterministically, inspect
+NES RAM before and after the input, and use Lua inputPolled callbacks if the
+simple schedule is insufficient. Save JSONL events, a final screenshot, AVI,
+WAV, and state JSON. Explain the exact state transition or why it failed.
+```
+
+Find and prove a gameplay regression:
+
+```text
+Use the mesen-agent skill to compare build/good.nes and build/bad.nes. Give each
+run a separate --home directory and identical frame/input schedules. Compare
+zero-page RAM, complete state JSON, screenshots, and traces. Locate the first
+meaningful divergence and report exact commands and artifact paths.
+```
+
+Debug machine code at a suspected routine:
+
+```text
+Use the mesen-agent skill on build/game.nes. Set an execute breakpoint at NES
+CPU address $C010, run until it hits, step one instruction, then return the PC,
+call stack, nearby disassembly with opcode bytes, relevant RAM, and a bounded
+trace. Confirm the final summary and do not infer success only from exit code.
+```
+
+Create a state-aware Lua test:
+
+```text
+Use the mesen-agent skill. Write and run a Lua test that reads NES internal RAM,
+drives controller input from inputPolled, asserts the expected gameplay state,
+checks a RAM write/read round trip, and exits nonzero on failure. Keep Lua IO and
+network disabled unless the test genuinely requires them. Capture PNG, AVI,
+WAV, save state, and JSONL evidence from $HOME/.local/bin/mesen-agent.
+```
 
 ## Why this helps coding agents
 
