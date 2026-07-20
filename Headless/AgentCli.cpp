@@ -901,11 +901,19 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 		}
 
 		for(const DisassembleRequest& request : options.Disassembly) {
-			vector<CodeLineData> lines(request.Lines);
-			uint32_t count = GetDisassemblyOutput(cpu, request.Address, lines.data(), request.Lines);
-			for(uint32_t i = 0; i < count; i++) {
+			//The desktop API includes labels and collapsible block-marker rows in
+			//its row count.  JSONL callers ask for instructions, so fetch enough UI
+			//rows to cover those markers and emit only rows with decoded opcodes.
+			uint64_t requestedRows = (uint64_t)request.Lines * 3 + 16;
+			if(requestedRows > 1000000) UsageError("disassembly line count is too large");
+			vector<CodeLineData> lines((size_t)requestedRows);
+			uint32_t count = GetDisassemblyOutput(cpu, request.Address, lines.data(), (uint32_t)lines.size());
+			uint32_t emitted = 0;
+			for(uint32_t i = 0; i < count && emitted < request.Lines; i++) {
 				CodeLineData& line = lines[i];
+				if(line.OpSize == 0) continue;
 				Event("\"event\":\"disassembly\",\"cpu\":\"" + string(magic_enum::enum_name(cpu)) + "\",\"address\":" + to_string(line.Address) + ",\"absolute_type\":\"" + string(magic_enum::enum_name(line.AbsoluteAddress.Type)) + "\",\"absolute_address\":" + to_string(line.AbsoluteAddress.Address) + ",\"bytes\":\"" + Hex(line.ByteCode, line.OpSize) + "\",\"text\":\"" + JsonEscape(line.Text) + "\",\"comment\":\"" + JsonEscape(line.Comment) + "\"");
+				emitted++;
 			}
 		}
 

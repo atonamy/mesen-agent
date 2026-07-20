@@ -88,7 +88,7 @@ assert any(e.get("event") == "program_counter" and e.get("value") == 0x8015 for 
 
 trace_events = [json.loads(line) for line in (work / "trace-events.jsonl").read_text().splitlines()]
 assert any(e.get("event") == "trace_saved" for e in trace_events)
-assert any(e.get("event") == "disassembly" and e.get("text", "").startswith("SEI") for e in trace_events)
+assert any(e.get("event") == "disassembly" and e.get("bytes") == "78" and e.get("text", "").startswith("SEI") for e in trace_events)
 assert (work / "trace.log").stat().st_size > 1000
 print("state reload, breakpoint, step, and trace smoke tests passed")
 PY

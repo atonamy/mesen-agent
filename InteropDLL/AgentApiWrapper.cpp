@@ -138,6 +138,14 @@ extern "C"
 	DllExport void __stdcall AgentInitializeHeadlessDefaults()
 	{
 		if(_emu) {
+			//A terminal disassembly request must decode the requested address even
+			//before the runtime/CDL cache has classified it.  The desktop defaults
+			//hide unidentified and data-marked bytes because its view can render
+			//collapsed blocks; JSONL output needs deterministic instruction rows.
+			DebugConfig& debugConfig = _emu->GetSettings()->GetDebugConfig();
+			debugConfig.DisassembleUnidentifiedData = true;
+			debugConfig.DisassembleVerifiedData = true;
+
 			//The desktop UI normally supplies its default NES palette through
 			//ConfigApi.  A native CLI has no managed configuration layer, so use
 			//the core's canonical 2C02 palette instead of the zero-initialized
