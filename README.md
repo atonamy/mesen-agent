@@ -512,6 +512,6 @@ release. Workflow artifacts and release archives never contain the GUI app.
 
 Mesen and this fork are available under GPL-3.0-or-later. See [LICENSE](LICENSE).
 
-Copyright (C) 2014–2025 Sour and Mesen contributors. Agent-focused changes are
+Copyright (C) 2014–2026 Sour and Mesen contributors. Agent-focused changes are
 maintained in this fork. This project is not affiliated with Nintendo or other
 console manufacturers.
