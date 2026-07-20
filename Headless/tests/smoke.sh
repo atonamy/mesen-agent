@@ -290,8 +290,12 @@ set -e
 quoted_dir="$work/quoted'path"
 mkdir -p "$quoted_dir"
 cp "$root/Headless/tests/lua-require.lua" "$root/Headless/tests/lua-helper.lua" "$quoted_dir/"
+quoted_script="$quoted_dir/lua-require.lua"
+case "$(uname -s)" in
+	MINGW*|MSYS*) quoted_script="$(cygpath -w "$quoted_script")" ;;
+esac
 "$cli" "$work/test.nes" --home "$work/lua-quoted-path-home" --frames 0 \
-	--lua-allow-io --lua "$quoted_dir/lua-require.lua" \
+	--lua-allow-io --lua "$quoted_script" \
 	> "$work/lua-quoted-path-events.jsonl"
 
 "$cli" "$work/test.nes" --home "$work/lua-debug-ops-home" --frames 100 \

@@ -797,24 +797,26 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 		bool timedOut = false;
 		bool executionStopped = false;
 		bool emulationStopped = false;
-		bool debuggerArmed = false;
 		uint32_t lastFrame = startFrame;
-		auto resumeTime = chrono::steady_clock::now();
 		auto deadline = chrono::steady_clock::now() + chrono::seconds(options.TimeoutSeconds);
+		uint64_t runStartClock = AgentGetMasterClock();
 		if(options.Frames > 0) {
-			ResumeExecution();
+			//Use the core debugger's PPU-frame counter as the run boundary.  Host-side
+			//polling can overshoot on fast machines and makes Lua event timing depend
+			//on scheduler latency; a PPU-frame step stops at the exact core boundary.
 			Resume();
+			Step(cpu, options.Frames, StepType::PpuFrame);
 		}
 		while(options.Frames > 0) {
 			uint32_t current = AgentGetFrameCount();
 			if(!IsRunning()) { emulationStopped = true; break; }
 			if(current >= startFrame) lastFrame = std::max(lastFrame, current);
 			uint32_t relative = lastFrame - startFrame;
-			if(relative >= options.Frames) break;
 			bool stopped = IsExecutionStopped();
-			if(!stopped) debuggerArmed = true;
-			if(stopped && (debuggerArmed || relative > 0 || chrono::steady_clock::now() - resumeTime > chrono::milliseconds(50))) {
-				executionStopped = true;
+			if(stopped && (relative > 0 || AgentGetMasterClock() != runStartClock)) {
+				//The PPU-frame request itself is the normal frame-limit stop.  Any
+				//earlier stop came from a breakpoint or script debug request.
+				executionStopped = relative < options.Frames;
 				break;
 			}
 			if(chrono::steady_clock::now() >= deadline) { timedOut = true; break; }

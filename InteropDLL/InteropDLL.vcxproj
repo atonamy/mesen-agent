@@ -230,7 +230,7 @@
     <ProjectReference Include="..\Utilities\Utilities.vcxproj">
       <Project>{b5330148-e8c7-46ba-b54e-69be59ea337d}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Windows\Windows.vcxproj">
+    <ProjectReference Include="..\Windows\Windows.vcxproj" Condition="'$(MesenAgentHeadless)'!='true'">
       <Project>{7761e790-b42c-4179-8550-8365ff9eb23e}</Project>
     </ProjectReference>
   </ItemGroup>
