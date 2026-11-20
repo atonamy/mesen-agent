@@ -261,7 +261,8 @@ void Fds::ProcessCpuClock()
 	if(_settings->FdsFastForwardOnLoad) {
 		_emu->GetSettings()->SetFlagState(EmulationFlags::MaximumSpeed, _scanningDisk || !_gameStarted);
 	} else {
-		_emu->GetSettings()->ClearFlag(EmulationFlags::MaximumSpeed);
+		//No longer force real-time here: the caller (headless agent) may have
+		//explicitly requested maximum speed.
 	}
 
 	ProcessAutoDiskInsert();
