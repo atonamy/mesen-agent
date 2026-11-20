@@ -868,7 +868,6 @@ int LuaApi::SetInput(lua_State* lua)
 {
 	LuaCallHelper l(lua);
 	l.ForceParamCount(3);
-	lua_settop(lua, 4);
 
 	int subport = l.ReadInteger(0);
 	int port = l.ReadInteger();
