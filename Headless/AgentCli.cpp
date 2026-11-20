@@ -705,6 +705,7 @@ relative address space for the active CPU.  All stdout records are JSON Lines.
 		if(!LoadRom(romArg.data(), patch.empty() ? nullptr : patchArg.data())) {
 			throw runtime_error("Mesen could not load ROM: " + rom);
 		}
+		SetEmulationFlag(EmulationFlags::MaximumSpeed, options.MaximumSpeed);
 
 		InitializeDebugger();
 		CpuType cpu = SelectCpu(options);
