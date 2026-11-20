@@ -159,6 +159,7 @@ extern "C"
 			//controller.  Keep special-device auto-detection intact: ROM metadata can
 			//replace these defaults while the ROM is loading.
 			nesConfig.Port1.Type = ControllerType::NesController;
+			nesConfig.Port2.Type = ControllerType::NesController;
 			_emu->GetSettings()->GetSnesConfig().Port1.Type = ControllerType::SnesController;
 			_emu->GetSettings()->GetGameboyConfig().Controller.Type = ControllerType::GameboyController;
 			_emu->GetSettings()->GetGbaConfig().Controller.Type = ControllerType::GbaController;
